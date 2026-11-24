@@ -1,0 +1,151 @@
+
+name: CRM Frontend CI-CD
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  NODE_VERSION: '22.x'
+
+jobs:
+
+  # STAGE 1 - BUILD
+  Build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build frontend
+        run: npm run build
+
+      - name: Prepare standalone deployment ZIP
+        run: |
+          mkdir deploy
+          cp -r .next/standalone/. deploy/
+          mkdir -p deploy/.next
+          cp -r .next/static deploy/.next/static
+          if [ -d public ]; then
+            cp -r public deploy/
+          fi
+          test -f deploy/server.js
+          cd deploy
+          zip -qr ../frontend.zip .
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-package
+          path: frontend.zip
+
+  # STAGE 2 - DEV
+  DEV:
+    needs: Build
+    runs-on: ubuntu-latest
+    environment: DEV-ENVIRONMENT
+
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: frontend-package
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Deploy DEV Frontend
+        run: |
+          az webapp start -g DEV-RESOURCEGROUP -n dev-frontendapp-crm
+          az webapp deploy \
+            -g DEV-RESOURCEGROUP \
+            -n dev-frontendapp-crm \
+            --src-path frontend.zip \
+            --type zip \
+            --clean true \
+            --restart true
+
+  # STAGE 3 - UAT
+  UAT:
+    needs: DEV
+    runs-on: ubuntu-latest
+    environment: UAT-ENVIRONMENT
+
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: frontend-package
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Deploy UAT Frontend
+        run: |
+          az webapp start -g UAT-RESOURCEGROUP -n uat-frontendapp-crm
+          az webapp deploy \
+            -g UAT-RESOURCEGROUP \
+            -n uat-frontendapp-crm \
+            --src-path frontend.zip \
+            --type zip \
+            --clean true \
+            --restart true
+
+  # STAGE 4 - PROD
+  PROD:
+    needs: UAT
+    runs-on: ubuntu-latest
+    environment: PROD-ENVIRONMENT
+
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: frontend-package
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Deploy PROD Frontend
+        run: |
+          az webapp start -g PROD-RESOURCEGROUP -n prod-frontendapp-crm
+          az webapp deploy \
+            -g PROD-RESOURCEGROUP \
+            -n prod-frontendapp-crm \
+            --src-path frontend.zip \
+            --type zip \
+            --clean true \
+            --restart true
