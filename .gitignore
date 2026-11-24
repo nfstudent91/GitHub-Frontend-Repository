@@ -1,0 +1,29 @@
+# Dependencies
+/node_modules/
+/yarn.lock
+
+# Next.js and generated build files
+/.next/
+/out/
+/build/
+/deploy/
+*.tsbuildinfo
+next-env.d.ts
+
+# Environment files
+.env*
+!.env.example
+
+# Local backups
+/*.backup
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+pnpm-debug.log*
+
+# Editor and deployment settings
+/.vscode/
+/.vercel/
