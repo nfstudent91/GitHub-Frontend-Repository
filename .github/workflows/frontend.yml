@@ -73,16 +73,31 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
+      - name: Start DEV Frontend
+        run: az webapp start -g DEV-RESOURCEGROUP -n dev-frontendapp-crm
+
       - name: Deploy DEV Frontend
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: dev-frontendapp-crm
+          package: frontend.zip
+
+      - name: Verify DEV Frontend
         run: |
-          az webapp start -g DEV-RESOURCEGROUP -n dev-frontendapp-crm
-          az webapp deploy \
-            -g DEV-RESOURCEGROUP \
-            -n dev-frontendapp-crm \
-            --src-path frontend.zip \
-            --type zip \
-            --clean true \
-            --restart true
+          for i in {1..30}; do
+            STATUS=$(curl -s -L --max-time 15 -o /dev/null -w "%{http_code}" https://dev-frontendapp-crm.azurewebsites.net/ || true)
+            echo "HTTP Status: $STATUS"
+
+            if [[ "$STATUS" == "200" ]]; then
+              echo "DEV Frontend is running successfully"
+              exit 0
+            fi
+
+            sleep 10
+          done
+
+          echo "DEV Frontend verification failed"
+          exit 1
 
   # STAGE 3 - UAT
   UAT:
@@ -106,16 +121,31 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
+      - name: Start UAT Frontend
+        run: az webapp start -g UAT-RESOURCEGROUP -n uat-frontendapp-crm
+
       - name: Deploy UAT Frontend
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: uat-frontendapp-crm
+          package: frontend.zip
+
+      - name: Verify UAT Frontend
         run: |
-          az webapp start -g UAT-RESOURCEGROUP -n uat-frontendapp-crm
-          az webapp deploy \
-            -g UAT-RESOURCEGROUP \
-            -n uat-frontendapp-crm \
-            --src-path frontend.zip \
-            --type zip \
-            --clean true \
-            --restart true
+          for i in {1..30}; do
+            STATUS=$(curl -s -L --max-time 15 -o /dev/null -w "%{http_code}" https://uat-frontendapp-crm.azurewebsites.net/ || true)
+            echo "HTTP Status: $STATUS"
+
+            if [[ "$STATUS" == "200" ]]; then
+              echo "UAT Frontend is running successfully"
+              exit 0
+            fi
+
+            sleep 10
+          done
+
+          echo "UAT Frontend verification failed"
+          exit 1
 
   # STAGE 4 - PROD
   PROD:
@@ -139,13 +169,28 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
+      - name: Start PROD Frontend
+        run: az webapp start -g PROD-RESOURCEGROUP -n prod-frontendapp-crm
+
       - name: Deploy PROD Frontend
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: prod-frontendapp-crm
+          package: frontend.zip
+
+      - name: Verify PROD Frontend
         run: |
-          az webapp start -g PROD-RESOURCEGROUP -n prod-frontendapp-crm
-          az webapp deploy \
-            -g PROD-RESOURCEGROUP \
-            -n prod-frontendapp-crm \
-            --src-path frontend.zip \
-            --type zip \
-            --clean true \
-            --restart true
+          for i in {1..30}; do
+            STATUS=$(curl -s -L --max-time 15 -o /dev/null -w "%{http_code}" https://prod-frontendapp-crm.azurewebsites.net/ || true)
+            echo "HTTP Status: $STATUS"
+
+            if [[ "$STATUS" == "200" ]]; then
+              echo "PROD Frontend is running successfully"
+              exit 0
+            fi
+
+            sleep 10
+          done
+
+          echo "PROD Frontend verification failed"
+          exit 1
